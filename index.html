@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Security Checkpoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #12172b;
+    --ink-deep: #0b0f1e;
+    --parchment: #f4ecd8;
+    --parchment-dim: #e8dcc0;
+    --line: #cbbb92;
+    --amber: #c98a2c;
+    --sage: #5b8266;
+    --sage-deep: #3f5c48;
+    --brick: #b8463c;
+    --brick-deep: #8a332b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, #1a2040 0%, var(--ink) 45%, var(--ink-deep) 100%);
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--parchment);
+    padding: 48px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .masthead {
+    text-align: center;
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  .masthead .kicker {
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    color: var(--amber);
+    margin-bottom: 10px;
+  }
+
+  .masthead h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(32px, 5vw, 46px);
+    margin: 0 0 12px;
+    line-height: 1.1;
+  }
+
+  .masthead p {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: rgba(244, 236, 216, 0.7);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .scan-form {
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 44px;
+  }
+
+  .scan-form input {
+    flex: 1;
+    background: var(--parchment);
+    border: 2px solid var(--line);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    padding: 16px 18px;
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .scan-form input:focus { border-color: var(--amber); }
+  .scan-form input::placeholder { color: #8a7f5f; }
+
+  .scan-form button {
+    background: var(--amber);
+    color: var(--ink-deep);
+    border: none;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 0 26px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+
+  .scan-form button:hover { background: #dda03d; }
+  .scan-form button:active { transform: scale(0.98); }
+  .scan-form button:disabled { opacity: 0.55; cursor: wait; }
+
+  .report {
+    width: 100%;
+    max-width: 640px;
+    background: var(--parchment);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 40px;
+    position: relative;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5);
+    display: none;
+  }
+
+  .report.visible {
+    display: block;
+    animation: rise 0.35s ease;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .report-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    border-bottom: 1px dashed var(--line);
+    padding-bottom: 22px;
+    margin-bottom: 22px;
+  }
+
+  .report-head .field-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #8a7f5f;
+    margin-bottom: 4px;
+  }
+
+  .report-head .url-value {
+    font-size: 14px;
+    font-weight: 500;
+    word-break: break-all;
+    max-width: 360px;
+  }
+
+  .report-head .url-value.redirect { margin-top: 10px; }
+
+  .stamp {
+    flex-shrink: 0;
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    border: 3px solid currentColor;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-8deg);
+    font-family: 'Fraunces', serif;
+  }
+
+  .stamp .grade-letter { font-size: 30px; font-weight: 700; line-height: 1; }
+  .stamp .grade-score { font-size: 10px; font-family: 'IBM Plex Mono', monospace; margin-top: 3px; letter-spacing: 0.05em; }
+
+  .stamp.safe { color: var(--sage-deep); }
+  .stamp.suspicious { color: var(--amber); }
+  .stamp.risk { color: var(--brick-deep); }
+
+  .classification-line { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
+
+  .classification-badge {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 5px 14px;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+  }
+
+  .classification-badge.safe { background: rgba(91,130,102,0.15); color: var(--sage-deep); }
+  .classification-badge.suspicious { background: rgba(201,138,44,0.18); color: #8a5f1c; }
+  .classification-badge.risk { background: rgba(184,70,60,0.16); color: var(--brick-deep); }
+
+  .classification-line .meta { font-size: 12.5px; color: #8a7f5f; }
+
+  .findings-label { font-size: 11px; letter-spacing: 0.1em; color: #8a7f5f; margin-bottom: 12px; }
+
+  .findings { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+
+  .findings li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--parchment-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .findings li .mark {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+
+  .findings li.pass .mark { background: rgba(91,130,102,0.18); color: var(--sage-deep); }
+  .findings li.fail .mark { background: rgba(184,70,60,0.16); color: var(--brick-deep); }
+
+  .findings li .check-name { font-weight: 600; }
+  .findings li .impact { font-size: 11.5px; color: #8a7f5f; margin-left: 6px; }
+  .findings li .detail { display: block; color: #4c4530; margin-top: 2px; }
+
+  .ledger { width: 100%; max-width: 640px; margin-top: 48px; }
+
+  .ledger h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; margin: 0 0 4px; }
+
+  .ledger .sub { font-size: 12.5px; color: rgba(244, 236, 216, 0.55); margin-bottom: 16px; }
+
+  .ledger-table { border: 1px solid rgba(244, 236, 216, 0.18); border-radius: 6px; overflow: hidden; }
+
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 1fr 70px 110px;
+    gap: 12px;
+    padding: 13px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(244, 236, 216, 0.1);
+    cursor: pointer;
+    transition: background 0.12s ease;
+    align-items: center;
+  }
+
+  .ledger-row:last-child { border-bottom: none; }
+  .ledger-row:hover { background: rgba(244, 236, 216, 0.06); }
+
+  .ledger-row .url-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ledger-row .grade-cell { font-family: 'Fraunces', serif; font-weight: 700; text-align: center; }
+
+  .grade-cell.safe { color: #8fbf9f; }
+  .grade-cell.suspicious { color: var(--amber); }
+  .grade-cell.risk { color: #e08277; }
+
+  .ledger-row .date-cell { font-size: 11.5px; color: rgba(244, 236, 216, 0.5); text-align: right; }
+
+  .ledger-empty { padding: 22px 16px; font-size: 13px; color: rgba(244, 236, 216, 0.45); text-align: center; }
+
+  .status-line { font-size: 13px; color: rgba(244, 236, 216, 0.55); margin-bottom: 20px; min-height: 18px; }
+  .status-line.error { color: #e08277; }
+
+  @media (max-width: 520px) {
+    .scan-form { flex-direction: column; }
+    .report { padding: 26px; }
+    .report-head { flex-direction: column-reverse; }
+    .ledger-row { grid-template-columns: 1fr 50px; }
+    .date-cell { display: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="masthead">
+    <div class="kicker">CHECKPOINT · URL SECURITY SCREENING</div>
+    <h1>Every link, inspected.</h1>
+    <p>Paste a URL below to run it through structural, SSL, phishing, and reputation screening — and receive a stamped clearance report.</p>
+  </div>
+
+  <form class="scan-form" id="scanForm">
+    <input type="text" id="urlInput" placeholder="e.g. amazon.com" autocomplete="off" required>
+    <button type="submit" id="scanButton">Screen This URL</button>
+  </form>
+
+  <div class="status-line" id="statusLine"></div>
+
+  <div class="report" id="report">
+    <div class="report-head">
+      <div>
+        <div class="field-label">SUBMITTED URL</div>
+        <div class="url-value" id="submittedUrl">—</div>
+        <div class="field-label" style="margin-top:12px;">FINAL DESTINATION</div>
+        <div class="url-value" id="finalUrl">—</div>
+      </div>
+      <div class="stamp" id="stamp">
+        <div class="grade-letter" id="gradeLetter">—</div>
+        <div class="grade-score" id="gradeScore">0/100</div>
+      </div>
+    </div>
+
+    <div class="classification-line">
+      <span class="classification-badge" id="classificationBadge">—</span>
+      <span class="meta" id="checksMeta"></span>
+    </div>
+
+    <div class="findings-label">INSPECTION LOG</div>
+    <ul class="findings" id="findingsList"></ul>
+  </div>
+
+  <div class="ledger">
+    <h2>Screening Ledger</h2>
+    <div class="sub">Past inspections, most recent first. Click a row to reopen its report.</div>
+    <div class="ledger-table" id="ledgerTable">
+      <div class="ledger-empty">No scans recorded yet.</div>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = 'http://127.0.0.1:8000';
+
+  const scanForm = document.getElementById('scanForm');
+  const urlInput = document.getElementById('urlInput');
+  const scanButton = document.getElementById('scanButton');
+  const statusLine = document.getElementById('statusLine');
+  const report = document.getElementById('report');
+  const ledgerTable = document.getElementById('ledgerTable');
+
+  function classificationClass(classification) {
+    if (classification === 'Safe') return 'safe';
+    if (classification === 'Suspicious') return 'suspicious';
+    return 'risk';
+  }
+
+  function renderReport(data) {
+    document.getElementById('submittedUrl').textContent = data.submitted_url;
+    document.getElementById('finalUrl').textContent = data.final_url;
+    document.getElementById('gradeLetter').textContent = data.grade;
+    document.getElementById('gradeScore').textContent = `${data.score}/100`;
+    document.getElementById('checksMeta').textContent = `${data.checks_performed} channels evaluated`;
+
+    const cls = classificationClass(data.classification);
+    const stamp = document.getElementById('stamp');
+    stamp.className = 'stamp ' + cls;
+
+    const badge = document.getElementById('classificationBadge');
+    badge.className = 'classification-badge ' + cls;
+    badge.textContent = data.classification;
+
+    const list = document.getElementById('findingsList');
+    list.innerHTML = '';
+    data.findings.forEach(f => {
+      const li = document.createElement('li');
+      li.className = f.passed ? 'pass' : 'fail';
+      li.innerHTML = `
+        <span class="mark">${f.passed ? '&#10003;' : '&#10007;'}</span>
+        <span>
+          <span class="check-name">${f.check}</span><span class="impact">${f.impact > 0 ? '+' : ''}${f.impact}</span>
+          <span class="detail">${f.detail}</span>
+        </span>
+      `;
+      list.appendChild(li);
+    });
+
+    report.classList.add('visible');
+  }
+
+  async function runScan(url) {
+    statusLine.textContent = '';
+    statusLine.classList.remove('error');
+    scanButton.disabled = true;
+    scanButton.textContent = 'Screening…';
+
+    try {
+      const res = await fetch(`${API_BASE}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Request failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      renderReport(data);
+      loadHistory();
+    } catch (e) {
+      statusLine.textContent = `Screening failed: ${e.message}. Is the backend running at ${API_BASE}?`;
+      statusLine.classList.add('error');
+    } finally {
+      scanButton.disabled = false;
+      scanButton.textContent = 'Screen This URL';
+    }
+  }
+
+  async function loadReportById(id) {
+    statusLine.textContent = '';
+    try {
+      const res = await fetch(`${API_BASE}/report/${id}`);
+      if (!res.ok) throw new Error(`Report not found (${res.status})`);
+      const data = await res.json();
+      renderReport(data);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      statusLine.textContent = `Could not load report: ${e.message}`;
+      statusLine.classList.add('error');
+    }
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' +
+           d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(`${API_BASE}/history?limit=20`);
+      if (!res.ok) throw new Error('History unavailable');
+      const scans = await res.json();
+
+      if (!scans.length) {
+        ledgerTable.innerHTML = '<div class="ledger-empty">No scans recorded yet.</div>';
+        return;
+      }
+
+      ledgerTable.innerHTML = '';
+      scans.forEach(scan => {
+        const cls = classificationClass(scan.classification);
+        const row = document.createElement('div');
+        row.className = 'ledger-row';
+        row.innerHTML = `
+          <span class="url-cell">${scan.submitted_url}</span>
+          <span class="grade-cell ${cls}">${scan.grade}</span>
+          <span class="date-cell">${formatDate(scan.scanned_at)}</span>
+        `;
+        row.addEventListener('click', () => loadReportById(scan.id));
+        ledgerTable.appendChild(row);
+      });
+    } catch (e) {
+      ledgerTable.innerHTML = `<div class="ledger-empty">Could not reach backend at ${API_BASE}.</div>`;
+    }
+  }
+
+  scanForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const url = urlInput.value.trim();
+    if (url) runScan(url);
+  });
+
+  loadHistory();
+</script>
+
+</body>
+</html>
