@@ -1,0 +1,7 @@
+main.py
+database.py
+checks/
+requirements.txt
+scans.db
+test_accuracy.py
+*.py
