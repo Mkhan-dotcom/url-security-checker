@@ -58,53 +58,20 @@ def check_url_length(url: str) -> dict:
             "detail": f"URL length ({length} chars) is normal."}
 
 
-def check_subdomain_count(url: str) -> dict:
-    domain = urlparse(url).netloc.split(":")[0]  # strip port if present
-    parts = domain.split(".")
-    # e.g. "login.secure.account.example.com" -> 5 parts -> 3 subdomains before "example.com"
-    subdomain_count = max(0, len(parts) - 2)
-    # Thresholds raised from the original (>2 / >3) after testing showed legitimate
-    # institutional domains (e.g. .edu, .gov, large orgs) routinely use 3-4 levels
-    # of subdomains for internal departments/services, which is normal there —
-    # not a phishing signal. This heuristic now only fires on genuinely excessive
-    # nesting, reducing false positives on real organizational sites.
-    if subdomain_count > 5:
-        return {"check": "Subdomain Count", "passed": False, "impact": -10,
-                "detail": f"{subdomain_count} subdomains detected — excessive nesting is a phishing red flag."}
-    elif subdomain_count > 4:
-        return {"check": "Subdomain Count", "passed": False, "impact": -5,
-                "detail": f"{subdomain_count} subdomains detected — more than typical."}
-    return {"check": "Subdomain Count", "passed": True, "impact": 0,
-            "detail": f"{subdomain_count} subdomain(s) — within normal range."}
-
-
 def check_special_characters(url: str) -> dict:
-    domain = urlparse(url).netloc
-    issues = []
-    impact = 0
-
+    """
+    Checks for the '@' symbol in a URL — a documented browser-parsing
+    exploit (everything before '@' is treated as userinfo and ignored,
+    so 'https://real-bank.com@attacker.com' actually navigates to
+    attacker.com). This is a factual detection of a known technique,
+    not a subjective pattern guess.
+    """
     if "@" in url:
-        issues.append("'@' symbol present (can hide the real destination)")
-        impact -= 15
-
-    hyphen_count = domain.count("-")
-    if hyphen_count >= 3:
-        issues.append(f"{hyphen_count} hyphens in domain — unusually high")
-        impact -= 10
-    elif hyphen_count >= 1:
-        issues.append(f"{hyphen_count} hyphen(s) in domain")
-        impact -= 3
-
-    digit_count = sum(c.isdigit() for c in domain)
-    if digit_count >= 4:
-        issues.append(f"{digit_count} digits in domain — unusually high")
-        impact -= 10
-
-    if issues:
-        return {"check": "Special Characters", "passed": False, "impact": impact,
-                "detail": "; ".join(issues)}
-    return {"check": "Special Characters", "passed": True, "impact": 0,
-            "detail": "No suspicious special-character patterns found."}
+        return {"check": "'@' Symbol Check", "passed": False, "impact": -15,
+                "detail": "'@' symbol present — this is a known technique to hide the "
+                          "real destination domain from users (everything before '@' is ignored)."}
+    return {"check": "'@' Symbol Check", "passed": True, "impact": 0,
+            "detail": "No '@' symbol found in URL."}
 
 
 def check_ip_as_domain(url: str) -> dict:
@@ -162,7 +129,6 @@ def run_all_url_structure_checks(raw_url: str) -> dict:
 
     findings = [
         check_url_length(url),
-        check_subdomain_count(url),
         check_special_characters(url),
         check_ip_as_domain(url),
         check_suspicious_tld(url),
