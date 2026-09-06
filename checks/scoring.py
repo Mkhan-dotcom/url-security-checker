@@ -9,12 +9,13 @@ as a standalone script (python checks/scoring.py) for manual testing.
 """
 
 try:
-    from . import url_structure, https_ssl, phishing_indicators, domain_reputation
+    from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence
 except ImportError:
     import url_structure
     import https_ssl
     import phishing_indicators
     import domain_reputation
+    import threat_intelligence
 
 
 def calculate_grade(score: int) -> tuple:
@@ -42,12 +43,14 @@ def run_full_scan(raw_url: str) -> dict:
     ssl_result = https_ssl.run_all_https_ssl_checks(structure_result["final_url"])
     phishing_result = phishing_indicators.run_all_phishing_checks(structure_result["final_url"])
     reputation_result = domain_reputation.run_all_domain_reputation_checks(structure_result["final_url"])
+    intel_result = threat_intelligence.run_all_threat_intelligence_checks(structure_result["final_url"])
 
     all_findings = (
         structure_result["findings"]
         + ssl_result["findings"]
         + phishing_result["findings"]
         + reputation_result["findings"]
+        + intel_result["findings"]
     )
 
     total_deductions = (
@@ -55,12 +58,13 @@ def run_full_scan(raw_url: str) -> dict:
         + ssl_result["total_impact"]
         + phishing_result["total_impact"]
         + reputation_result["total_impact"]
+        + intel_result["total_impact"]
     )
 
     score = max(0, min(100, 100 + total_deductions))
     grade, classification = calculate_grade(score)
 
-    if reputation_result["safe_browsing_flagged"]:
+    if reputation_result["safe_browsing_flagged"] or intel_result["urlhaus_flagged"]:
         score = min(score, 20)
         grade = "F"
         classification = "High Risk"

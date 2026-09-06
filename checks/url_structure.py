@@ -28,6 +28,24 @@ def normalize_url(raw_url: str) -> str:
     return raw_url
 
 
+def is_valid_domain_format(url: str) -> bool:
+    """
+    Checks that the domain portion looks like a real, resolvable domain
+    (at least one dot + valid TLD) OR a valid IPv4 address (IP-based URLs
+    are syntactically valid and should be scanned/flagged by
+    check_ip_as_domain, not rejected outright).
+    Rejects bare words like 'amazone' that have no TLD and aren't an IP.
+    """
+    domain = urlparse(url).netloc.split(":")[0]
+
+    ip_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
+    if re.match(ip_pattern, domain):
+        return True
+
+    domain_pattern = r"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
+    return bool(re.match(domain_pattern, domain))
+
+
 def check_url_length(url: str) -> dict:
     length = len(url)
     if length > 100:
@@ -45,10 +63,15 @@ def check_subdomain_count(url: str) -> dict:
     parts = domain.split(".")
     # e.g. "login.secure.account.example.com" -> 5 parts -> 3 subdomains before "example.com"
     subdomain_count = max(0, len(parts) - 2)
-    if subdomain_count > 3:
+    # Thresholds raised from the original (>2 / >3) after testing showed legitimate
+    # institutional domains (e.g. .edu, .gov, large orgs) routinely use 3-4 levels
+    # of subdomains for internal departments/services, which is normal there —
+    # not a phishing signal. This heuristic now only fires on genuinely excessive
+    # nesting, reducing false positives on real organizational sites.
+    if subdomain_count > 5:
         return {"check": "Subdomain Count", "passed": False, "impact": -10,
                 "detail": f"{subdomain_count} subdomains detected — excessive nesting is a phishing red flag."}
-    elif subdomain_count > 2:
+    elif subdomain_count > 4:
         return {"check": "Subdomain Count", "passed": False, "impact": -5,
                 "detail": f"{subdomain_count} subdomains detected — more than typical."}
     return {"check": "Subdomain Count", "passed": True, "impact": 0,
