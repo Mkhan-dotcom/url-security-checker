@@ -15,9 +15,11 @@ Then open http://127.0.0.1:8000/docs to test it interactively.
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
 from checks import scoring
+from checks.url_structure import normalize_url, is_valid_domain_format
 import database
 
 app = FastAPI(
@@ -26,11 +28,47 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allows a browser-based frontend (running on a different port/domain) to call this API.
-# Restrict allow_origins to your actual frontend URL once deployed.
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Adds the same security headers this tool checks OTHER sites for —
+    practicing what it inspects. Includes a Content-Security-Policy,
+    X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
+    """
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "script-src 'self'; "
+            "connect-src 'self' https://url-security-checker-production.up.railway.app;"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Restricted from the earlier wildcard ("*") to only the origins this app
+# actually needs to serve:
+#   - the real production frontend on Vercel
+#   - "null", because opening index.html directly via file:// (as used
+#     throughout local development/testing) sends Origin: null, not a
+#     normal http:// origin — browsers do this specifically for local
+#     files, so it must be explicitly allowed for local testing to work.
+# A wildcard was fine for early development but is unnecessarily permissive
+# for a deployed API with real API keys behind it.
+ALLOWED_ORIGINS = [
+    "https://url-security-checker.vercel.app",
+    "null",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -50,6 +88,13 @@ def scan_url(request: ScanRequest):
     """Runs the full detection pipeline on a URL, stores the result, and returns it."""
     if not request.url or not request.url.strip():
         raise HTTPException(status_code=400, detail="URL must not be empty.")
+
+    normalized = normalize_url(request.url)
+    if not is_valid_domain_format(normalized):
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{request.url.strip()}' is not a valid domain (missing a valid TLD, e.g. .com, .org)."
+        )
 
     try:
         report = scoring.run_full_scan(request.url.strip())

@@ -316,10 +316,17 @@
     </div>
   </div>
 
-<script>
-  //const API_BASE = 'http://127.0.0.1:8000';///
 
-  const API_BASE = 'https://url-security-checker-production.up.railway.app';
+
+
+<script>
+ // const API_BASE = 'http://127.0.0.1:8000'; //
+
+  
+ const API_BASE = 'https://url-security-checker-production.up.railway.app';
+
+
+
 
   const scanForm = document.getElementById('scanForm');
   const urlInput = document.getElementById('urlInput');
@@ -354,13 +361,34 @@
     data.findings.forEach(f => {
       const li = document.createElement('li');
       li.className = f.passed ? 'pass' : 'fail';
-      li.innerHTML = `
-        <span class="mark">${f.passed ? '&#10003;' : '&#10007;'}</span>
-        <span>
-          <span class="check-name">${f.check}</span><span class="impact">${f.impact > 0 ? '+' : ''}${f.impact}</span>
-          <span class="detail">${f.detail}</span>
-        </span>
-      `;
+
+      const mark = document.createElement('span');
+      mark.className = 'mark';
+      mark.textContent = f.passed ? '\u2713' : '\u2715';
+
+      const body = document.createElement('span');
+
+      const checkName = document.createElement('span');
+      checkName.className = 'check-name';
+      checkName.textContent = f.check; // textContent, not innerHTML — safe from injected markup
+
+      const impact = document.createElement('span');
+      impact.className = 'impact';
+      impact.textContent = `${f.impact > 0 ? '+' : ''}${f.impact}`;
+
+      const detail = document.createElement('span');
+      detail.className = 'detail';
+      detail.textContent = f.detail; // detail can include external data (e.g. threat-feed
+                                      // tags); textContent guarantees it can never be
+                                      // interpreted as HTML/JS, even if malicious.
+
+      body.appendChild(checkName);
+      body.appendChild(impact);
+      body.appendChild(document.createElement('br'));
+      body.appendChild(detail);
+
+      li.appendChild(mark);
+      li.appendChild(body);
       list.appendChild(li);
     });
 
@@ -433,11 +461,22 @@
         const cls = classificationClass(scan.classification);
         const row = document.createElement('div');
         row.className = 'ledger-row';
-        row.innerHTML = `
-          <span class="url-cell">${scan.submitted_url}</span>
-          <span class="grade-cell ${cls}">${scan.grade}</span>
-          <span class="date-cell">${formatDate(scan.scanned_at)}</span>
-        `;
+
+        const urlCell = document.createElement('span');
+        urlCell.className = 'url-cell';
+        urlCell.textContent = scan.submitted_url; // user-supplied input — must stay textContent, never innerHTML
+
+        const gradeCell = document.createElement('span');
+        gradeCell.className = `grade-cell ${cls}`;
+        gradeCell.textContent = scan.grade;
+
+        const dateCell = document.createElement('span');
+        dateCell.className = 'date-cell';
+        dateCell.textContent = formatDate(scan.scanned_at);
+
+        row.appendChild(urlCell);
+        row.appendChild(gradeCell);
+        row.appendChild(dateCell);
         row.addEventListener('click', () => loadReportById(scan.id));
         ledgerTable.appendChild(row);
       });

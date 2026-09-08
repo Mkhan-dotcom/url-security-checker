@@ -4,3 +4,7 @@ requests
 python-whois
 python-dotenv
 pydantic
+scikit-learn
+joblib
+tldextract
+pandas
