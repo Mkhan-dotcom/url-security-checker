@@ -13,6 +13,8 @@ Run locally with:
 Then open http://127.0.0.1:8000/docs to test it interactively.
 """
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -21,6 +23,8 @@ from pydantic import BaseModel
 from checks import scoring
 from checks.url_structure import normalize_url, is_valid_domain_format
 import database
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="URL Security & Phishing Detection System",
@@ -98,8 +102,9 @@ def scan_url(request: ScanRequest):
 
     try:
         report = scoring.run_full_scan(request.url.strip())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scan failed: {e}")
+    except Exception:
+        logger.exception("Scan failed for submitted URL")
+        raise HTTPException(status_code=500, detail="Scan failed. Please try again later.")
 
     scan_id = database.save_scan(report)
     report["id"] = scan_id

@@ -1,15 +1,25 @@
 """
 scoring.py
-Combines results from url_structure, https_ssl, and phishing_indicators
-into a single 0-100 score, A-F grade, and Safe/Suspicious/High Risk
-classification.
+Combines live destination checks and the URL-only ML prediction into a single
+0-100 score, A-F grade, and Safe/Suspicious/High Risk classification. Other
+heuristic URL-shape and shortener findings are reported but excluded from the
+score.
 
 Works both as part of the 'checks' package (imported from main.py) and
 as a standalone script (python checks/scoring.py) for manual testing.
 """
 
+# try:
+#     from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence, ml_classifier
+# except ImportError:
+#     import url_structure
+#     import https_ssl
+#     import phishing_indicators
+#     import domain_reputation
+#     import threat_intelligence
+#     import ml_classifier
 try:
-    from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence, ml_classifier
+    from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence, ml_classifier, security_posture
 except ImportError:
     import url_structure
     import https_ssl
@@ -17,6 +27,14 @@ except ImportError:
     import domain_reputation
     import threat_intelligence
     import ml_classifier
+    import security_posture
+
+
+
+
+
+
+
 
 
 
@@ -50,6 +68,8 @@ def run_full_scan(raw_url: str) -> dict:
     # intel_result = threat_intelligence.run_all_threat_intelligence_checks(structure_result["final_url"])
     intel_result = threat_intelligence.run_all_threat_intelligence_checks(structure_result["final_url"])
     ml_result = ml_classifier.run_all_ml_checks(structure_result["final_url"])
+    posture_result = security_posture.run_all_security_posture_checks(structure_result["final_url"])
+
 
 
     all_findings = (
@@ -58,17 +78,28 @@ def run_full_scan(raw_url: str) -> dict:
         + phishing_result["findings"]
         + reputation_result["findings"]
         + intel_result["findings"]
-        + ml_result["findings"]   
+        + ml_result["findings"]
+        + posture_result["findings"]   
     )
 
-
+    # URL-shape rules and the URL shortener list remain visible as context but
+    # are not included in the score. The ML prediction is included as a
+    # separate statistical signal alongside the live destination checks.
+    redirect_impact = next(
+        finding["impact"]
+        for finding in structure_result["findings"]
+        if finding["check"] == "Redirect Chain"
+    )
     total_deductions = (
-        structure_result["total_impact"]
+        redirect_impact
         + ssl_result["total_impact"]
-        + phishing_result["total_impact"]
         + reputation_result["total_impact"]
         + intel_result["total_impact"]
+        + ml_result["total_impact"]
+        + posture_result["total_impact"]
     )
+
+
 
     score = max(0, min(100, 100 + total_deductions))
     grade, classification = calculate_grade(score)
@@ -85,6 +116,7 @@ def run_full_scan(raw_url: str) -> dict:
         "grade": grade,
         "classification": classification,
         "checks_performed": len(all_findings),
+        "score_basis": "live checks and ML prediction",
         "findings": all_findings,
     }
 

@@ -320,8 +320,7 @@
 
 
 <script>
- const API_BASE = 'http://127.0.0.1:8000'; 
-
+  const API_BASE = 'http://127.0.0.1:8000';
   
 //  const API_BASE = 'https://url-security-checker-production.up.railway.app';
 
@@ -346,7 +345,10 @@
     document.getElementById('finalUrl').textContent = data.final_url;
     document.getElementById('gradeLetter').textContent = data.grade;
     document.getElementById('gradeScore').textContent = `${data.score}/100`;
-    document.getElementById('checksMeta').textContent = `${data.checks_performed} channels evaluated`;
+    document.getElementById('checksMeta').textContent =
+      data.score_basis === 'live checks and ML prediction'
+        ? 'Score based on live checks + ML prediction'
+        : `${data.checks_performed} checks evaluated`;
 
     const cls = classificationClass(data.classification);
     const stamp = document.getElementById('stamp');

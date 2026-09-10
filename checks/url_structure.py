@@ -14,6 +14,7 @@ Each check returns a dict:
 
 import re
 import socket
+import ipaddress
 from urllib.parse import urlparse
 import requests
 
@@ -38,9 +39,11 @@ def is_valid_domain_format(url: str) -> bool:
     """
     domain = urlparse(url).netloc.split(":")[0]
 
-    ip_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
-    if re.match(ip_pattern, domain):
-        return True
+    try:
+        if isinstance(ipaddress.ip_address(domain), ipaddress.IPv4Address):
+            return True
+    except ValueError:
+        pass
 
     domain_pattern = r"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
     return bool(re.match(domain_pattern, domain))

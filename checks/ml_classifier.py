@@ -176,10 +176,14 @@ def check_ml_classifier(url: str) -> dict:
                     "detail": f"Random Forest model predicts legitimate with high confidence "
                               f"({phishing_probability:.0%} phishing probability)."}
 
-    except Exception as e:
-        return {"check": "ML Phishing Classifier", "passed": True, "impact": 0,
-                "detail": f"ML classifier unavailable: {e}"}
+    # except Exception as e:
+    #     return {"check": "ML Phishing Classifier", "passed": False, "impact": 0,
+    #             "detail": f"ML classifier unavailable: {e}"}
 
+    except Exception:
+        return {"check": "ML Phishing Classifier", "passed": True, "impact": 0,
+                "detail": "ML classifier temporarily unavailable — this check was skipped, "
+                          "not scored as a failure."}
 
 def run_all_ml_checks(raw_url: str) -> dict:
     findings = [check_ml_classifier(raw_url)]
