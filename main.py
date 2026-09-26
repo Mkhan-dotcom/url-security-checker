@@ -14,7 +14,9 @@ Then open http://127.0.0.1:8000/docs to test it interactively.
 """
 
 import logging
-
+# following line (1st change) for resticate access to backend docs etc
+import os
+# ------------------
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -26,35 +28,25 @@ import database
 
 logger = logging.getLogger(__name__)
 
+#  commenting out the following line (2nd change) to restrict access to backend docs etc and replace it with the ENABLE_DOCS logic below
+
+# app = FastAPI(
+#     title="URL Security & Phishing Detection System",
+#     description="Scans a URL for structural, SSL, phishing, and reputation risk signals.",
+#     version="1.0.0",
+# )
+# -------------------------------------
+# this one line is added to allow the backend docs to be disabled in production... 
+ENABLE_DOCS = os.getenv("ENABLE_DOCS", "true").lower() == "true"
+
 app = FastAPI(
     title="URL Security & Phishing Detection System",
     description="Scans a URL for structural, SSL, phishing, and reputation risk signals.",
     version="1.0.0",
+    docs_url="/docs" if ENABLE_DOCS else None,
+    redoc_url="/redoc" if ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_DOCS else None,
 )
-
-
-#  use following middleware to add security headers to all responses, but commented out for now because it breaks the Swagger UI (which is served from a different origin than this API)
-
-# class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-#     """
-#     Adds the same security headers this tool checks OTHER sites for —
-#     practicing what it inspects. Includes a Content-Security-Policy,
-#     X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
-#     """
-#     async def dispatch(self, request, call_next):
-#         response = await call_next(request)
-#         response.headers["Content-Security-Policy"] = (
-#             "default-src 'self'; "
-#             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-#             "font-src https://fonts.gstatic.com; "
-#             "script-src 'self'; "
-#             "connect-src 'self' https://url-security-checker-production.up.railway.app;"
-#         )
-#         response.headers["X-Content-Type-Options"] = "nosniff"
-#         response.headers["X-Frame-Options"] = "DENY"
-#         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-#         return response
-
 
 #  -------------------------------------------------------------------------------
 
@@ -86,17 +78,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
-
-
-
-
-
-
-
-
-
-
-
 
 
 
