@@ -1,5 +1,5 @@
-const API_BASE = 'http://127.0.0.1:8001'; 
-// const API_BASE = 'https://url-security-checker-production.up.railway.app';
+// const API_BASE = 'http://127.0.0.1:8001'; 
+const API_BASE = 'https://url-security-checker-production.up.railway.app';
 
 // Category-level representation of the real backend checks (cookie/header
 // findings are grouped under one line each here, since the exact count
