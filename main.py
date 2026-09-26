@@ -33,14 +33,48 @@ app = FastAPI(
 )
 
 
+#  use following middleware to add security headers to all responses, but commented out for now because it breaks the Swagger UI (which is served from a different origin than this API)
+
+# class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+#     """
+#     Adds the same security headers this tool checks OTHER sites for —
+#     practicing what it inspects. Includes a Content-Security-Policy,
+#     X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
+#     """
+#     async def dispatch(self, request, call_next):
+#         response = await call_next(request)
+#         response.headers["Content-Security-Policy"] = (
+#             "default-src 'self'; "
+#             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+#             "font-src https://fonts.gstatic.com; "
+#             "script-src 'self'; "
+#             "connect-src 'self' https://url-security-checker-production.up.railway.app;"
+#         )
+#         response.headers["X-Content-Type-Options"] = "nosniff"
+#         response.headers["X-Frame-Options"] = "DENY"
+#         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+#         return response
+
+
+#  -------------------------------------------------------------------------------
+
+#  use following middleware to add security headers to all responses, but skip the interactive docs routes (/docs, /redoc, /openapi.json) because they load their UI from an external CDN that a strict CSP would otherwise block
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
-    Adds the same security headers this tool checks OTHER sites for —
-    practicing what it inspects. Includes a Content-Security-Policy,
-    X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
+    Adds security headers to every response, except the interactive docs
+    routes (/docs, /redoc, /openapi.json), which load their UI from an
+    external CDN that a strict CSP would otherwise block.
     """
+    DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+
     async def dispatch(self, request, call_next):
         response = await call_next(request)
+
+        if request.url.path in self.DOCS_PATHS:
+            return response
+
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
@@ -52,6 +86,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 app.add_middleware(SecurityHeadersMiddleware)

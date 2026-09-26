@@ -41,7 +41,7 @@ except ImportError:
 
 def calculate_grade(score: int) -> tuple:
     """Maps a 0-100 score to a letter grade and risk classification."""
-    if score >= 90:
+    if score >= 87:
         return "A", "Safe"
     elif score >= 80:
         return "B", "Safe"

@@ -30,6 +30,9 @@ HEADERS_TO_CHECK = [
     ("Permissions-Policy", "Permissions-Policy missing — no restriction on camera/mic/geolocation APIs."),
 ]
 
+# Small, deliberately short list. Each is checked against a baseline
+# nonsense path first so servers that return 200 for everything don't
+# generate false positives.
 SENSITIVE_PATHS = [
     "/.env",
     "/.git/config",
@@ -48,7 +51,7 @@ def _safe_get(url, **kwargs):
         return requests.get(
             url, timeout=REQUEST_TIMEOUT, headers={"User-Agent": USER_AGENT}, **kwargs
         )
-    except requests.RequestException:
+    except requests.RequestException as e:
         return None
 
 
@@ -77,6 +80,7 @@ def check_cookie_flags(response) -> list:
 
     raw_cookies = response.raw.headers.get_all("Set-Cookie") if hasattr(response.raw, "headers") else None
     if not raw_cookies:
+        # No cookies set at all — nothing to flag, not a failure.
         findings.append(_finding("Cookie Security Flags", True, 0, "No cookies set by this response."))
         return findings
 
@@ -112,10 +116,10 @@ def check_mixed_content(response, final_url: str) -> list:
         return []
 
     html = response.text
-    http_refs = re.findall(r'(?:src|href)=["\']http://[^"\']+["\']', html, re.IGNORECASE)
+    http_refs = re.findall(r'(?:src|href)=["\']http://([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}[^"\']*)["\']', html, re.IGNORECASE)
 
     if http_refs:
-        example = http_refs[0].split("=", 1)[1].strip("\"'")
+        example = "http://" + http_refs[0].rstrip("\"'")
         return [
             _finding(
                 "Mixed Content",
@@ -134,6 +138,8 @@ def check_server_disclosure(response) -> list:
 
     for header_name in ("Server", "X-Powered-By"):
         value = response.headers.get(header_name)
+        # Flag only if it looks like it includes an actual version number,
+        # not just a bare product name (e.g. "nginx" vs "nginx/1.18.0").
         if value and re.search(r"\d+\.\d+", value):
             findings.append(
                 _finding(
@@ -158,14 +164,32 @@ def check_exposed_files(base_url: str) -> list:
     origin = origin_match.group(1)
 
     baseline = _safe_get(f"{origin}/__nonexistent_probe_a1b2c3/")
-    baseline_status = baseline.status_code if baseline else None
-    baseline_length = len(baseline.content) if baseline else None
+
+    # If we can't even reach a nonsense path, we have no reliable baseline
+    # to compare against — report this as unverified, not as a clean pass.
+    # (Previously this case silently fell through to "None ... exposed",
+    # which looked identical to a genuine clean result.)
+    if baseline is None:
+        findings.append(
+            _finding(
+                "Exposed Sensitive Files",
+                True,
+                0,
+                "Could not connect to the server — exposed-file check was not verified.",
+            )
+        )
+        return findings
+
+    baseline_status = baseline.status_code
+    baseline_length = len(baseline.content)
 
     any_exposed = False
+    any_reachable = False
     for path in SENSITIVE_PATHS:
         resp = _safe_get(f"{origin}{path}")
         if resp is None:
             continue
+        any_reachable = True
 
         looks_real = resp.status_code == 200 and (
             baseline_status != 200 or len(resp.content) != baseline_length
@@ -183,9 +207,19 @@ def check_exposed_files(base_url: str) -> list:
             )
 
     if not any_exposed:
-        findings.append(
-            _finding("Exposed Sensitive Files", True, 0, "None of the common sensitive file paths were exposed.")
-        )
+        if any_reachable:
+            findings.append(
+                _finding("Exposed Sensitive Files", True, 0, "None of the common sensitive file paths were exposed.")
+            )
+        else:
+            findings.append(
+                _finding(
+                    "Exposed Sensitive Files",
+                    True,
+                    0,
+                    "All requests to candidate paths failed to connect — check was not verified.",
+                )
+            )
     return findings
 
 
