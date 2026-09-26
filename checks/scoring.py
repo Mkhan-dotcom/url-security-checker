@@ -8,16 +8,6 @@ score.
 Works both as part of the 'checks' package (imported from main.py) and
 as a standalone script (python checks/scoring.py) for manual testing.
 """
-
-# try:
-#     from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence, ml_classifier
-# except ImportError:
-#     import url_structure
-#     import https_ssl
-#     import phishing_indicators
-#     import domain_reputation
-#     import threat_intelligence
-#     import ml_classifier
 try:
     from . import url_structure, https_ssl, phishing_indicators, domain_reputation, threat_intelligence, ml_classifier, security_posture
 except ImportError:
@@ -28,16 +18,6 @@ except ImportError:
     import threat_intelligence
     import ml_classifier
     import security_posture
-
-
-
-
-
-
-
-
-
-
 
 def calculate_grade(score: int) -> tuple:
     """Maps a 0-100 score to a letter grade and risk classification."""

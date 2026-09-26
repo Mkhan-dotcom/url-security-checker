@@ -12,18 +12,15 @@
 </head>
 <body>
 
-  <div class="bg-aurora" aria-hidden="true">
-    <span class="blob blob-a"></span>
-    <span class="blob blob-b"></span>
-    <span class="blob blob-c"></span>
+  <div class="bg-particles-wrap" aria-hidden="true">
+    <canvas id="bgParticles"></canvas>
   </div>
 
   <div class="page">
 
     <header class="hero">
       <h1>Is this link sus?</h1>
-      <p>Paste any URL and we'll run it through 20+ real checks — structure, encryption, threat intel, and a phishing model trained on 11,430 real URLs — before you tap it.</p>
-
+      <p>Paste any URL and we'll run it through 20+ real checks — structure, encryption, threat intel, and a ML phishing model trained on 11,430 real URLs — before you tap it.</p>
       <form class="scan-form" id="scanForm">
         <input type="text" id="urlInput" placeholder="paste a link…" autocomplete="off" required>
         <button type="submit" id="scanButton">Scan it</button>
@@ -106,9 +103,7 @@
       <p>20 real checks — structure, SSL, reputation, threat intel &amp; an ML phishing model.</p>
       <p class="credit">Designed &amp; built by <strong>Mk</strong></p>
     </footer>
-
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>

@@ -1,34 +1,114 @@
-const API_BASE = 'http://127.0.0.1:8001'; 
-// const API_BASE = 'https://url-security-checker-production.up.railway.app';
+// Background particle network animation
+(() => {
+  const canvas = document.getElementById('bgParticles');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const LINK_DIST = 130;
+  let w = 0, h = 0, dpr = 1, particles = [], raf = 0, running = false;
+  const mouse = { x: -9999, y: -9999 };
 
-// Category-level representation of the real backend checks (cookie/header
-// findings are grouped under one line each here, since the exact count
-// varies per site). Drives the checklist animation and status text below.
+  function size() {
+    w = window.innerWidth;
+    h = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const count = Math.min(110, Math.max(30, Math.round((w * h) / 15000)));
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.8,
+    }));
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > w) p.vx *= -1;
+      if (p.y < 0 || p.y > h) p.vy *= -1;
+      const dx = mouse.x - p.x, dy = mouse.y - p.y, d2 = dx * dx + dy * dy;
+      if (d2 < 24000 && d2 > 1) {
+        p.x += dx / d2 * 18;
+        p.y += dy / d2 * 18;
+      }
+    }
+
+    ctx.beginPath();
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < LINK_DIST * LINK_DIST) {
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+        }
+      }
+    }
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.55)';
+    for (const p of particles) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (running) raf = requestAnimationFrame(frame);
+  }
+
+  function start() { if (!running && !reduceMotion) { running = true; raf = requestAnimationFrame(frame); } }
+  function stop() { running = false; cancelAnimationFrame(raf); }
+
+  size();
+  if (reduceMotion) {
+    frame(); // draw one static frame, no loop
+  } else {
+    start();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop(); else start();
+    });
+  }
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { size(); if (reduceMotion) frame(); }, 160);
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  }, { passive: true });
+
+  window.addEventListener('pointerleave', () => { mouse.x = mouse.y = -9999; });
+})();
+
+// ============================================================
+// API & UI logic
+// const API_BASE = 'http://127.0.0.1:8001';
+const API_BASE = 'https://url-security-checker-production.up.railway.app';
+
+// Category-level representation of the real backend checks, used only
+// to pace the radar's progress percentage and cycle the status text.
 const CHECK_SEQUENCE = [
-  'URL length',
-  "'@' symbol check",
-  'IP address as domain',
-  'Suspicious TLD',
-  'Redirect chain',
-  'HTTPS enforced',
-  'SSL certificate validity',
-  'TLS version',
-  'HSTS header',
-  'URL shortener check',
-  'Domain age',
-  'Google Safe Browsing',
-  'URLhaus malware database',
-  'Certificate transparency',
-  'ML phishing classifier',
-  'Security headers',
-  'Cookie flags',
-  'Mixed content',
-  'Server disclosure',
+  'URL length', "'@' symbol check", 'IP address as domain', 'Suspicious TLD',
+  'Redirect chain', 'HTTPS enforced', 'SSL certificate validity', 'TLS version',
+  'HSTS header', 'URL shortener check', 'Domain age', 'Google Safe Browsing',
+  'URLhaus malware database', 'Certificate transparency', 'ML phishing classifier',
+  'Security headers', 'Cookie flags', 'Mixed content', 'Server disclosure',
   'Exposed sensitive files',
 ];
 
-// One status line per rough phase of the checklist above — purely narrative,
-// updates as the checklist progresses through each group.
 const STATUS_PHASES = [
   { upTo: 3, text: 'Reading the URL & structure…' },
   { upTo: 8, text: 'Verifying encryption & certificates…' },
@@ -53,7 +133,7 @@ const gaugeFill = document.getElementById('gaugeFill');
 
 const GAUGE_CIRCUMFERENCE = 326.7256; // 2 * PI * r(52) — final score gauge
 const RADAR_CIRCUMFERENCE = 402.1239; // 2 * PI * r(64) — in-progress radar ring
-const RADAR_CAP = 92; // never let the fake progress claim 100% before real data arrives
+const RADAR_CAP = 92; // never claim 100% before real data arrives
 
 let scanStepTimeout = null;
 let scanTimerInterval = null;
@@ -63,8 +143,6 @@ function classificationClass(classification) {
   if (classification === 'Suspicious') return 'suspicious';
   return 'risk';
 }
-
-// ---------- Scan-in-progress animation (radar sweep + percent ring) ----------
 
 function setRadarProgress(percent) {
   const offset = RADAR_CIRCUMFERENCE - (RADAR_CIRCUMFERENCE * percent) / 100;
@@ -84,21 +162,18 @@ function startScanAnimation(url) {
 
   const startTime = Date.now();
   let stepIndex = 0;
-  let percent = 0;
   updateStatusText(0);
 
   const scheduleNext = () => {
     const delay = 380 + Math.random() * 380;
     scanStepTimeout = setTimeout(() => {
       stepIndex += 1;
-      percent = Math.min(RADAR_CAP, Math.round((stepIndex / CHECK_SEQUENCE.length) * 100));
+      const percent = Math.min(RADAR_CAP, Math.round((stepIndex / CHECK_SEQUENCE.length) * 100));
       setRadarProgress(percent);
       if (stepIndex < CHECK_SEQUENCE.length && percent < RADAR_CAP) {
         updateStatusText(stepIndex);
         scheduleNext();
       }
-      // If real data arrives before we hit the cap, progress just holds —
-      // honest, since we don't actually know how close the backend is.
     }, delay);
   };
   scheduleNext();
@@ -124,26 +199,16 @@ function finishScanAnimation(callback) {
   setTimeout(callback, 350);
 }
 
-// ---------- Score gauge ----------
-
 function animateGauge(score, cls) {
   gaugeFill.classList.remove('safe', 'suspicious', 'risk');
   gaugeFill.classList.add(cls);
-
-  // Reset to empty, force reflow, then animate to target so the fill
-  // transition actually plays on every fresh render.
   gaugeFill.style.transition = 'none';
   gaugeFill.style.strokeDashoffset = String(GAUGE_CIRCUMFERENCE);
   void gaugeFill.getBoundingClientRect();
   gaugeFill.style.transition = '';
-
   const offset = GAUGE_CIRCUMFERENCE - (GAUGE_CIRCUMFERENCE * score) / 100;
-  requestAnimationFrame(() => {
-    gaugeFill.style.strokeDashoffset = String(offset);
-  });
+  requestAnimationFrame(() => { gaugeFill.style.strokeDashoffset = String(offset); });
 }
-
-// ---------- Report rendering ----------
 
 function renderReport(data, { celebrate } = { celebrate: false }) {
   document.getElementById('submittedUrl').textContent = data.submitted_url;
@@ -153,7 +218,6 @@ function renderReport(data, { celebrate } = { celebrate: false }) {
   document.getElementById('checksMeta').textContent = `${data.checks_performed} checks run`;
 
   const cls = classificationClass(data.classification);
-
   const badge = document.getElementById('classificationBadge');
   badge.className = 'verdict-badge ' + cls;
   badge.textContent = data.classification;
@@ -171,10 +235,9 @@ function renderReport(data, { celebrate } = { celebrate: false }) {
     mark.textContent = f.passed ? '\u2713' : '\u2715';
 
     const body = document.createElement('span');
-
     const checkName = document.createElement('span');
     checkName.className = 'check-name';
-    checkName.textContent = f.check; // textContent, not innerHTML — safe from injected markup
+    checkName.textContent = f.check;
 
     const impact = document.createElement('span');
     impact.className = 'impact';
@@ -182,9 +245,7 @@ function renderReport(data, { celebrate } = { celebrate: false }) {
 
     const detail = document.createElement('span');
     detail.className = 'detail';
-    detail.textContent = f.detail; // detail can include external data (e.g. threat-feed
-                                    // tags); textContent guarantees it can never be
-                                    // interpreted as HTML/JS, even if malicious.
+    detail.textContent = f.detail;
 
     body.appendChild(checkName);
     body.appendChild(impact);
@@ -199,8 +260,6 @@ function renderReport(data, { celebrate } = { celebrate: false }) {
   report.classList.toggle('just-scored', Boolean(celebrate));
   report.classList.add('visible');
 }
-
-// ---------- Network calls ----------
 
 async function runScan(url) {
   statusLine.textContent = '';
@@ -286,7 +345,7 @@ async function loadHistory() {
 
       const urlCell = document.createElement('span');
       urlCell.className = 'url-cell';
-      urlCell.textContent = scan.submitted_url; // user-supplied input — must stay textContent, never innerHTML
+      urlCell.textContent = scan.submitted_url;
 
       const gradeCell = document.createElement('span');
       gradeCell.className = `grade-cell ${cls}`;
