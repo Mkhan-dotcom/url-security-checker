@@ -4,7 +4,9 @@ requests
 python-whois
 python-dotenv
 pydantic
-scikit-learn
+scikit-learn==1.9.0
 joblib
 tldextract
 pandas
+psycopg[binary]
+certifi
