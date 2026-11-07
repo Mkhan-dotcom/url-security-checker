@@ -96,7 +96,7 @@
 // ============================================================
 // API & UI logic
 // const API_BASE = 'http://127.0.0.1:8001';
-const API_BASE = 'https://url-security-checker-api.vercel';
+const API_BASE = 'https://url-security-checker-api.vercel.app';
 
 // Category-level representation of the real backend checks, used only
 // to pace the radar's progress percentage and cycle the status text.
